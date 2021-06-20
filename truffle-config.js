@@ -14,9 +14,6 @@ module.exports = {
    *
    * $ truffle test --network <network-name>
    */
-  api_keys: {
-    bscscan: 'KUISC6J1WRREU6FBI6JCGKA2NMRB6T1ZS5'
-  },
   networks: {
     develop: {
       provider: () => {
