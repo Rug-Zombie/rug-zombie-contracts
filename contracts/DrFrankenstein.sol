@@ -108,7 +108,7 @@ contract DrFrankenstein is Ownable {
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event WithdrawEarly(address indexed user, uint256 indexed pid, uint256 amountWithdrawn, uint256 amountLocked);
     event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
-    event ReviveRug(address indexed to, uint date, uint indexed id);
+    event ReviveRug(address indexed to, uint date, address nft, uint indexed id);
 
     constructor(
         IZombieToken _zombie,
@@ -363,7 +363,7 @@ contract DrFrankenstein is Ownable {
         }
         if (_amount > 0) {
             user.tokenWithdrawalDate = block.timestamp + pool.minimumStakingTime;
-            if (user.amount == 0) {
+            if (user.amount < pool.minimumStake) {
                 user.nftRevivalDate = block.timestamp + pool.nftRevivalTime;
             }
             if (pool.isGrave == true) {
@@ -397,10 +397,10 @@ contract DrFrankenstein is Ownable {
         }
 
         // mint nft
-        if(pool.isGrave == true && block.timestamp >= user.nftRevivalDate) {
+        if(pool.isGrave == true && user.amount >= pool.minimumStake && block.timestamp >= user.nftRevivalDate) {
             IRevivedRugNft _nft = IRevivedRugNft(pool.nft);
             uint256 id = _nft.reviveRug(msg.sender);
-            emit ReviveRug(msg.sender, block.timestamp, id);
+            emit ReviveRug(msg.sender, block.timestamp, pool.nft, id);
             user.nftRevivalDate = block.timestamp + pool.nftRevivalTime;
         }
 
@@ -472,9 +472,6 @@ contract DrFrankenstein is Ownable {
         PoolInfo storage pool = poolInfo[0];
         UserInfo storage user = userInfo[0][msg.sender];
         updatePool(0);
-        if (user.amount == 0 && _amount > 0) {
-            user.nftRevivalDate = block.timestamp + pool.nftRevivalTime;
-        }
 
         if (user.amount > 0) {
             uint256 pending = ((user.amount * pool.accZombiePerShare) / 1e12) - user.rewardDebt;
@@ -483,6 +480,9 @@ contract DrFrankenstein is Ownable {
             }
         }
         if(_amount > 0) {
+            if (user.amount < pool.minimumStake) {
+                user.nftRevivalDate = block.timestamp + pool.nftRevivalTime;
+            }
             require(pool.lpToken.transferFrom(address(msg.sender), address(this), _amount));
             user.amount = user.amount + _amount;
             user.tokenWithdrawalDate = block.timestamp + pool.minimumStakingTime;
@@ -507,9 +507,9 @@ contract DrFrankenstein is Ownable {
         }
 
         // mint nft
-        if(pool.isGrave == true && block.timestamp >= pool.nftRevivalTime && user.amount > 0) {
+        if(pool.isGrave == true && user.amount >= pool.minimumStake && block.timestamp >= user.nftRevivalDate) {
             uint id = IRevivedRugNft(pool.nft).reviveRug(msg.sender);
-            emit ReviveRug(msg.sender, block.timestamp, id);
+            emit ReviveRug(msg.sender, block.timestamp,  pool.nft, id);
             user.nftRevivalDate = block.timestamp + pool.nftRevivalTime;
         }
 
@@ -546,13 +546,6 @@ contract DrFrankenstein is Ownable {
 
         if(pending > 0) {
             safeZombieTransfer(msg.sender, pending);
-        }
-
-        // mint nft
-        if(block.timestamp >= user.nftRevivalDate && user.amount > 0) {
-            uint id = IRevivedRugNft(pool.nft).reviveRug(msg.sender);
-            emit ReviveRug(msg.sender, block.timestamp, id);
-            user.nftRevivalDate = block.timestamp + pool.nftRevivalTime;
         }
 
         if(_amount > 0) {
