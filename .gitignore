@@ -1,4 +1,4 @@
 node_modules/
 build/
 .idea/
-truffle-config.js
+.secret
