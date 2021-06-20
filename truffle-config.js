@@ -27,9 +27,6 @@ module.exports = {
             1,
             false
         )
-        // var nonceTracker = new NonceTrackerSubprovider()
-        // wallet.engine._providers.unshift(nonceTracker)
-        // nonceTracker.setEngine(wallet.engine)
         return wallet
       },
       port: 8545,
