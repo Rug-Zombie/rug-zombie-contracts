@@ -14,8 +14,7 @@ contract RevivedRugNft is ERC721, Ownable {
     mapping (uint256 => string) private _tokenURIs;
 
     // Base URI
-    uint public baseURIBatchSize = 1000;
-    string[] public baseURIs;
+    string private _baseURIextended;
 
     event MintNft(address to, uint date, address nft, uint tokenId, string tokenURI); // Used to generate NFT data on external decentralized storage service
 

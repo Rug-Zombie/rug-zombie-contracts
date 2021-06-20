@@ -315,7 +315,6 @@ contract("DrFrankenstein", (accounts) => {
     it('Should fail calling #withdraw before time is up', async () => {
         const time = 2592000 // 30 days ms
         const amount = (await lpToken.balanceOf(accounts[0]))
-        console.log(amount.toString())
         await drFrankenstein.deposit(1, amount, {from: accounts[0], gas: 3000000, nonce: await nonce()})
 
         //should pass

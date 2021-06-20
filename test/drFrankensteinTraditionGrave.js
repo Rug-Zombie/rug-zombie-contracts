@@ -137,8 +137,6 @@ contract("DrFrankenstein", (accounts) => {
                 nonce: await nonce()
             })
         } catch (e) {
-            console.log('here')
-            console.log(e.message)
             assert(e.message.includes('Grave: cannot unlock, insufficient bnb sent.'))
             return
         }
