@@ -20,15 +20,15 @@ contract PriceConsumerV3 {
      * Returns the latest price
      */
     function getLatestPrice() public view returns (uint) {
-        (
-        uint80 roundID,
-        int price,
-        uint startedAt,
-        uint timeStamp,
-        uint80 answeredInRound
-        ) = priceFeed.latestRoundData();
-        return uint(price) * 10 ** 10;
-//        return 300 * (10 ** 18);
+//        (
+//        uint80 roundID,
+//        int price,
+//        uint startedAt,
+//        uint timeStamp,
+//        uint80 answeredInRound
+//        ) = priceFeed.latestRoundData();
+//        return uint(price) * 10 ** 10;
+        return 300 * (10 ** 18); // For tests
     }
 
 

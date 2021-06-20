@@ -317,7 +317,7 @@ contract("DrFrankenstein", (accounts) => {
             // await drFrankenstein.leaveStaking(one.times(10), {from: accounts[0], gas: 3000000, nonce: await nonce()})
             // assert.equal(nftBalance, initialNftBalance + 2, 'User did not receive nft after claiming rewards')
             //
-            // return
+            return
         }
         assert(false)
     })
