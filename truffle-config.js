@@ -1,8 +1,8 @@
 const fs = require('fs');
 const mnemonic = fs.readFileSync(".secret").toString().trim();
+const bscscanApiKey = fs.readFileSync(".bscscanApiKey").toString().trim();
 
 const HDWalletProvider = require("truffle-hdwallet-provider");
-// var NonceTrackerSubprovider = require("web3-provider-engine/subproviders/nonce-tracker")
 
 module.exports = {
   /**
@@ -50,8 +50,10 @@ module.exports = {
   mocha: {
     // timeout: 100000
   },
-  plugins: ["truffle-contract-size", 'truffle-plugin-verify'],
-
+  plugins: ['truffle-plugin-verify'],
+  api_keys: {
+    bscscan: bscscanApiKey,
+  },
   // Configure your compilers
   compilers: {
     solc: {
