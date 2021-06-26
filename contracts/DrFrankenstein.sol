@@ -83,7 +83,7 @@ contract DrFrankenstein is Ownable {
     address public devaddr;
     // ZMBE tokens created per block.
     uint256 public zombiePerBlock;
-    // Bonus multiplier for early zokbie makers.
+    // Bonus multiplier for early zombie makers.
     uint256 public BONUS_MULTIPLIER = 1;
     // The migrator contract. It has a lot of power. Can only be set through governance (owner).
     IMigratorChef public migrator;
@@ -131,7 +131,7 @@ contract DrFrankenstein is Ownable {
         // staking pool
         poolInfo.push(PoolInfo({
         lpToken: IGraveStakingToken(address(_zombie)),
-        allocPoint: 1000,
+        allocPoint: 100,
         lastRewardBlock: startBlock,
         accZombiePerShare: 0,
         minimumStakingTime: 3 days,
@@ -144,7 +144,7 @@ contract DrFrankenstein is Ownable {
         nftRevivalTime: 30 days
         }));
 
-        totalAllocPoint = 1000;
+        totalAllocPoint = 100;
 
         // testnet
         pancakeswapRouter = IUniswapV2Router02(_pancakeRouter);
@@ -216,7 +216,6 @@ contract DrFrankenstein is Ownable {
         unlockFee: 0,
         nftRevivalTime: 0
         }));
-        updateStakingPool();
     }
 
     // Add a new grave. Can only be called by the owner.
@@ -254,7 +253,6 @@ contract DrFrankenstein is Ownable {
         unlockFee: _unlockFee,
         nftRevivalTime: _nftRevivalTime
         }));
-        updateStakingPool();
     }
 
     // Update the given pool's ZMBE allocation point. Can only be called by the owner.
@@ -266,20 +264,6 @@ contract DrFrankenstein is Ownable {
         poolInfo[_pid].allocPoint = _allocPoint;
         if (prevAllocPoint != _allocPoint) {
             totalAllocPoint = (totalAllocPoint - prevAllocPoint) + _allocPoint;
-            updateStakingPool();
-        }
-    }
-
-    function updateStakingPool() internal {
-        uint256 length = poolInfo.length;
-        uint256 points = 0;
-        for (uint256 pid = 1; pid < length; ++pid) {
-            points = points + poolInfo[pid].allocPoint;
-        }
-        if (points != 0) {
-            points = points / 3;
-            totalAllocPoint = (totalAllocPoint - poolInfo[0].allocPoint) + points;
-            poolInfo[0].allocPoint = points;
         }
     }
 
@@ -628,7 +612,7 @@ contract DrFrankenstein is Ownable {
         uint _toTreasury = _projectFunds.calcPortionFromBasisPoints(5000);
         uint _buyBack = _projectFunds - _toTreasury;
 
-        withdrawBnbToTreasury(_toTreasury); // half of unlock fee goes to treasury
+        treasury.transfer(_toTreasury); // half of unlock fee goes to treasury
         buyBackAndBurn(_buyBack);           // the rest is used to buy back and burn zombie token
 
         userInfo[_pid][msg.sender].paidUnlockFee = true;
@@ -744,11 +728,6 @@ contract DrFrankenstein is Ownable {
         swapZombieForBnb(bnbAmount);
         uint256 _zombieBoughtBack = zombie.balanceOf(address(this)) - _initialZombieBalance;
         zombie.transfer(address(0), _zombieBoughtBack); // Send bought zombie to burn address
-    }
-
-    // Transfers bnb to the treasury
-    function withdrawBnbToTreasury(uint _amount) public onlyOwner {
-        treasury.transfer(_amount);
     }
 
     // Returns grave unlock fee in bnb
