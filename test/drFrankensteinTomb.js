@@ -12,7 +12,8 @@ const RevivedRugNft = artifacts.require("RevivedRugNft")
 const pancakeswapFactoryAddress = "0x6725F303b657a9451d8BA641348b6761A6CC7a17"
 const pancakeswapRouterAddress = "0xD99D1c33F9fC3444f8101754aBC46c52416550D1"
 const wbnbAddress = "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"
-const burnAddress = "0x0000000000000000000000000000000000000000"
+const burnAddress = "0x000000000000000000000000000000000000dEaD"
+const lpStorage = "0x8df5b3ece7c11749588ed2d102dbc77619c46776"
 const treasury = "0x8df5b3ece7c11749588ed2d102dbc77619c46776"
 let drFrankenstein
 let zombie
@@ -261,7 +262,7 @@ contract("DrFrankenstein", (accounts) => {
         const initialGraveBalance = await lpToken.balanceOf(drFrankenstein.address)
         const initialGraveUserBalance = (await drFrankenstein.userInfo(1, accounts[0])).amount
         const initialBurnBalance = await zombie.balanceOf(burnAddress)
-        const initialLockedLiquidityBalance = await  lpToken.balanceOf(burnAddress)
+        const initialLockedLiquidityBalance = await  lpToken.balanceOf(lpStorage)
         const initialTreasuryBalance = await  wbnb.balanceOf(treasury)
 
         assert(amount.toString() !== "0")
@@ -279,7 +280,7 @@ contract("DrFrankenstein", (accounts) => {
         const tokenWithdrawalDate = user.tokenWithdrawalDate.toNumber()
         const expectedTokenWithdrawalDate = (Date.now() / 1000) + pool.minimumStakingTime.toNumber()
         const burnBalance = await zombie.balanceOf(burnAddress)
-        const lockedLiquidityBalance = await lpToken.balanceOf(burnAddress)
+        const lockedLiquidityBalance = await lpToken.balanceOf(lpStorage)
         const treasuryBalance = await wbnb.balanceOf(treasury)
 
         const walletZombieBalance = await zombie.balanceOf(accounts[0])
@@ -315,6 +316,7 @@ contract("DrFrankenstein", (accounts) => {
     it('Should fail calling #withdraw before time is up', async () => {
         const time = 2592000 // 30 days ms
         const amount = (await lpToken.balanceOf(accounts[0]))
+        const whaleTax = amount.mul(new BN('8')).div(new BN('100'))
         await drFrankenstein.deposit(1, amount, {from: accounts[0], gas: 3000000, nonce: await nonce()})
 
         //should pass
@@ -333,7 +335,8 @@ contract("DrFrankenstein", (accounts) => {
             await drFrankenstein.withdraw(1, amount, {from: accounts[0], gas: 3000000, nonce: await nonce()})
             const walletBalance = (await lpToken.balanceOf(accounts[0]))
             const nftBalance = (await traditionalGraveNft.balanceOf(accounts[0]))
-            assert.equal(walletBalance.toString(), amount.toString())
+
+            assert.equal(walletBalance.toString(), amount.sub(whaleTax).toString())
             assert.equal(nftBalance.toString(), "0")
             return
         }

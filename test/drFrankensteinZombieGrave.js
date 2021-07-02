@@ -2,14 +2,14 @@
 
 const BigNumber = require("bignumber.js");
 
-const DrFrankensteinZombieGrave = artifacts.require("DrFrankenstein")
+const DrFrankensteinZombieGrave = artifacts.require("DrFrankensteinTest")
 const ZombieToken = artifacts.require("ZombieToken")
 const UndeadBar = artifacts.require("UndeadBar")
 const PancakeRouter = artifacts.require("IPancakeRouter02")
 const RevivedRugNft = artifacts.require("RevivedRugNft")
 const PriceConsumerV3 = artifacts.require("PriceConsumerV3")
 const pancakeswapRouterAddress = "0xD99D1c33F9fC3444f8101754aBC46c52416550D1"
-const burnAddress = "0x0000000000000000000000000000000000000000"
+const burnAddress = "0x000000000000000000000000000000000000dEaD"
 const treasury = "0x8df5b3ece7c11749588ed2d102dbc77619c46776"
 let drFrankenstein
 let zombie
@@ -60,7 +60,7 @@ contract("DrFrankenstein", (accounts) => {
             {from: accounts[0], gas: 3000000, value: one.div(10)}
         )
 
-        await zombieGraveNft.setBaseURI('123', {from: accounts[0], gas: 3000000, nonce: await nonce()})
+        await zombieGraveNft.setTokenURI('123', {from: accounts[0], gas: 3000000, nonce: await nonce()})
 
         // DrFrankenstein setup
         await undead.transferOwnership(drFrankenstein.address, {from: accounts[0], gas: 3000000, nonce: await nonce()})
@@ -126,7 +126,7 @@ contract("DrFrankenstein", (accounts) => {
         const initialGraveAmount = await zombie.balanceOf(drFrankenstein.address)
         const initialUserAmount = (await drFrankenstein.userInfo(0, accounts[0])).amount
         const initialWalletAmount = new BigNumber(await zombie.balanceOf(accounts[0]))
-        const amount = one.times(100)
+        const amount = one.times(2000)
 
         await drFrankenstein.enterStaking(amount, {from: accounts[0], gas: 3000000, nonce: await nonce()})
 
@@ -139,9 +139,9 @@ contract("DrFrankenstein", (accounts) => {
         const nftRevivalDate = userInfo.nftRevivalDate.toNumber()
         const expectedNftRevivalDate = (Date.now() / 1000) + poolInfo.nftRevivalTime.toNumber()
 
-        assert.equal(graveAmount.toString(), amount.plus(initialGraveAmount).toString())
+        assert.equal(graveAmount.toString(), amount.plus(initialGraveAmount).toString(10))
         assert.equal(walletAmount.toString(), initialWalletAmount.minus(amount).toString(10))
-        assert.equal(userInfo.amount.toString(), amount.plus(initialUserAmount).toString())
+        assert.equal(userInfo.amount.toString(), amount.plus(initialUserAmount).toString(10))
         assert(
             Math.abs(tokenWithdrawalDate - expectedTokenWithdrawalDate) < 5,
             `expected ${expectedTokenWithdrawalDate} but got ${tokenWithdrawalDate}`
@@ -170,9 +170,9 @@ contract("DrFrankenstein", (accounts) => {
         const expectedTokenWithdrawalDate = (Date.now() / 1000) + poolInfo.minimumStakingTime.toNumber()
         const nftRevivalDate = userInfo.nftRevivalDate.toNumber()
 
-        assert.equal(graveAmount.toString(), amount.plus(initialGraveAmount).toString(), 'DrFrankenstein zombie balance did not increase by expected amount')
-        assert.equal(walletAmount.toString(), initialWalletAmount.minus(amount).plus(one.times(10)).toString(10), 'Wallet zombie balance did not decrease by expected amount') // We add 10 to mitigate claimed rewards over one block
-        assert.equal(userInfo.amount.toString(), amount.plus(initialUserAmount).toString(), 'User grave amount did not increase by expected amount')
+        assert.equal(graveAmount.toString(), amount.plus(initialGraveAmount).toString(10), 'DrFrankenstein zombie balance did not increase by expected amount')
+        assert.equal(walletAmount.toString(), initialWalletAmount.minus(amount).toString(10), 'Wallet zombie balance did not decrease by expected amount') // We add 10 to mitigate claimed rewards over one block
+        assert.equal(userInfo.amount.toString(), amount.plus(initialUserAmount).toString(10), 'User grave amount did not increase by expected amount')
         assert(
             Math.abs(tokenWithdrawalDate - expectedTokenWithdrawalDate) < 4,
             `expected ${expectedTokenWithdrawalDate} but got ${tokenWithdrawalDate}`,
@@ -197,14 +197,14 @@ contract("DrFrankenstein", (accounts) => {
         const nftRevivalDate = userInfo.nftRevivalDate.toNumber()
 
         assert.equal(graveAmount.toString(), initialGraveAmount.toString(), 'DrFrankenstein zombie had unexpected change')
-        assert.equal(walletAmount.toString(), initialWalletAmount.plus(one.times(10)).toString(10), 'Wallet zombie balance did not increase by expected amount') // We add 10 to mitigate claimed rewards over one block
+        assert.equal(walletAmount.toString(), initialWalletAmount.toString(10), 'Wallet zombie balance did not increase by expected amount') // We add 10 to mitigate claimed rewards over one block
         assert.equal(userInfo.amount.toString(), initialUserAmount.toString(), 'User grave amount had unexpected change')
         assert.equal(tokenWithdrawalDate, initialTokenWithdrawalDate, 'User grave tokenWithdrawalDate has unexpected change')
         assert.equal(nftRevivalDate, initialNftRevivalDate, 'User grave nftRevivalTime had unexpected change')
     })
 
     it('Should withdraw, burn and treasure 5% fee and reset token withdrawal date on #leaveStakingEarly', async () => {
-        const amount = one.times(50)
+        const amount = one.times(150)
         const projectFunds = amount.times(0.05)
         const expectedBurnAmount = projectFunds.times(0.5)                      // 2.5%
         const expectedToTreasuryAmount = projectFunds.minus(expectedBurnAmount)    // 2.5%
@@ -228,7 +228,7 @@ contract("DrFrankenstein", (accounts) => {
 
         assert.equal(burnBalance.toString(), expectedBurnAmount.plus(initialBurnBalance).toString(10), "Unexpected amount of ZMBE was sent to burn address")
         assert.equal(treasuryBalance.toString(), expectedToTreasuryAmount.plus(initialTreasuryBalance).toString(), "Incorrect amount of ZMBE was sent to treasury")
-        assert.equal(walletBalance.toString(), expectedWalletAmount.plus(initialWalletBalance).plus(one.times(10)).toString(10), "Incorrect amount of ZMBE sent to wallet") // We add 10 to mitigate claimed rewards over one block
+        assert.equal(walletBalance.toString(), expectedWalletAmount.plus(initialWalletBalance).toString(10), "Incorrect amount of ZMBE sent to wallet") // We add 10 to mitigate claimed rewards over one block
         assert(
             Math.abs(tokenWithdrawalDate - expectedTokenWithdrawalDate) < 4,
             `expected ${expectedTokenWithdrawalDate} but got ${tokenWithdrawalDate}`,
@@ -237,7 +237,7 @@ contract("DrFrankenstein", (accounts) => {
     })
 
     it('Should fail when remaining amount after #leaveStakingEarly remaining amount is less than grave minimum stake', async () => {
-        const amount = one.times(145)
+        const amount = one.times(1000)
         try {
             await drFrankenstein.leaveStakingEarly(amount, {from: accounts[0], gas: 3000000, nonce: await nonce()})
         } catch (e) {
@@ -257,6 +257,7 @@ contract("DrFrankenstein", (accounts) => {
         await drFrankenstein.leaveStakingEarly(amount, {from: accounts[0], gas: 3000000, nonce: await nonce()})
 
         const walletBalance = await zombie.balanceOf(accounts[0])
+
         userInfo = await drFrankenstein.userInfo(0, accounts[0])
         const poolInfo = await drFrankenstein.poolInfo(0)
         const expectedTokenWithdrawalDate = (Date.now() / 1000) + poolInfo.minimumStakingTime.toNumber()
@@ -264,10 +265,10 @@ contract("DrFrankenstein", (accounts) => {
         const nftRevivalDate = userInfo.nftRevivalDate.toNumber()
         const nftBalance = (await zombieGraveNft.balanceOf(accounts[0])).toNumber()
 
-        assert(
-            expectedWalletAmount.plus(initialWalletBalance).lt(walletBalance),
+        assert.equal(
+            expectedWalletAmount.plus(initialWalletBalance).toString(10), walletBalance.toString(),
             "Incorrect amount of ZMBE sent to wallet"
-        ) // We add 10 to mitigate claimed rewards over one block
+        )
         assert(
             Math.abs(tokenWithdrawalDate - expectedTokenWithdrawalDate) < 4,
             `expected ${expectedTokenWithdrawalDate} but got ${tokenWithdrawalDate}`,

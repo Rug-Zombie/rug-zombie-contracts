@@ -8,7 +8,7 @@ const PancakeRouter = artifacts.require("IPancakeRouter02")
 const RevivedRugNft = artifacts.require("RevivedRugNft")
 const ExampleRuggedToken = artifacts.require("RuggedToken")
 const pancakeswapRouterAddress = "0xD99D1c33F9fC3444f8101754aBC46c52416550D1"
-const burnAddress = "0x0000000000000000000000000000000000000000"
+const burnAddress = "0x000000000000000000000000000000000000dEaD"
 const treasury = "0x8df5b3ece7c11749588ed2d102dbc77619c46776"
 let drFrankenstein
 let zombie
@@ -74,7 +74,7 @@ contract("DrFrankenstein", (accounts) => {
             {from: accounts[0], gas: 3000000, value: one.div(10), nonce: await nonce()}
         )
 
-        traditionalGraveNft.setBaseURI('123', {from: accounts[0], gas: 3000000, nonce: await nonce()})
+        traditionalGraveNft.setTokenURI('123', {from: accounts[0], gas: 3000000, nonce: await nonce()})
 
         // DrFrankenstein setup
         await undead.transferOwnership(drFrankenstein.address, {from: accounts[0], gas: 3000000, nonce: await nonce()})
@@ -224,11 +224,11 @@ contract("DrFrankenstein", (accounts) => {
         assert.equal(lpTokenBalance.toString(10), initialLpTokenBalance.plus(amount).toString(10), 'Unexpected grave lp balance')
         assert.equal(graveUserBalance.toString(10), initialGraveUserBalance.plus(amount).toString(10), 'Unexpected grave user balance')
         assert(
-            Math.abs(tokenWithdrawalDate - expectedTokenWithdrawalDate) < 4,
+            Math.abs(tokenWithdrawalDate - expectedTokenWithdrawalDate) < 6,
             `expected ${expectedTokenWithdrawalDate} but got ${tokenWithdrawalDate}`
         )
         assert(
-            Math.abs(nftRevivalDate - expectedNftRevivalDate) < 4,
+            Math.abs(nftRevivalDate - expectedNftRevivalDate) < 6,
             `expected ${expectedNftRevivalDate} but got ${nftRevivalDate}`
         )
     })
