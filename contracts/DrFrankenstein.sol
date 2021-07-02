@@ -73,6 +73,7 @@ contract DrFrankenstein is Ownable {
         uint256 unlockFee;                      // Unlock fee (In BUSD, Chainlink Oracle is used to convert fee to current BNB value).
         uint256 minimumStake;                   // Minimum amount of lpTokens required to stake.
         uint256 nftRevivalTime;                 // Duration a user must stake before they can redeem their nft reward.
+        uint256 unlocks;                        // Number of times a grave is unlocked
     }
 
     // The ZMBE TOKEN!
@@ -100,6 +101,8 @@ contract DrFrankenstein is Ownable {
 
     // Project addresses
     address payable treasury;   // Address of project treasury contract
+    address public lpStorage; // Address locked LP is sent to (Allows us to migrate lp if Pancakeswap moves to v3 / we start an AMM)
+    address public burnAddr = 0x000000000000000000000000000000000000dEaD; // Burn address
 
     // Chainlink BNB Price
     IPriceConsumerV3 public priceConsumer;
@@ -115,6 +118,7 @@ contract DrFrankenstein is Ownable {
         IUndeadBar _undead,
         address _devaddr,
         address payable _treasury,
+        address _lpStorage,
         address _pancakeRouter,
         address _firstNft,
         address _priceConsumer,
@@ -125,28 +129,28 @@ contract DrFrankenstein is Ownable {
         undead = _undead;
         devaddr = _devaddr;
         treasury = _treasury;
+        lpStorage = _lpStorage;
         zombiePerBlock = _zombiePerBlock;
         startBlock = _startBlock;
 
         // staking pool
         poolInfo.push(PoolInfo({
-        lpToken: IGraveStakingToken(address(_zombie)),
-        allocPoint: 100,
-        lastRewardBlock: startBlock,
-        accZombiePerShare: 0,
-        minimumStakingTime: 3 days,
-        requiresRug: false,
-        isGrave: true,
-        ruggedToken: IGraveStakingToken(address(0)),
-        minimumStake: 10 * (10 ** 18),
-        nft: _firstNft,
-        unlockFee: 5 * (10 ** 18),
-        nftRevivalTime: 30 days
+            lpToken: IGraveStakingToken(address(_zombie)),
+            allocPoint: 100,
+            lastRewardBlock: startBlock,
+            accZombiePerShare: 0,
+            minimumStakingTime: 5 minutes,
+            requiresRug: false,
+            isGrave: true,
+            ruggedToken: IGraveStakingToken(address(0)),
+            minimumStake: 1000 * (10 ** 18),
+            nft: _firstNft,
+            unlockFee: 5 * (10 ** 18),
+            nftRevivalTime: 10 minutes,
+            unlocks: 0
         }));
 
         totalAllocPoint = 100;
-
-        // testnet
         pancakeswapRouter = IUniswapV2Router02(_pancakeRouter);
         priceConsumer = IPriceConsumerV3(_priceConsumer);
     }
@@ -202,19 +206,20 @@ contract DrFrankenstein is Ownable {
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint + _allocPoint;
         poolInfo.push(PoolInfo({
-        lpToken: _lpToken,
-        allocPoint: _allocPoint,
-        lastRewardBlock: lastRewardBlock,
-        accZombiePerShare: 0,
-        minimumStakingTime: _minimumStakingTime,
-        // Null grave variables
-        isGrave: false,
-        requiresRug: false,
-        ruggedToken: IGraveStakingToken(address(0)),
-        nft: address(0),
-        minimumStake: 0,
-        unlockFee: 0,
-        nftRevivalTime: 0
+            lpToken: _lpToken,
+            allocPoint: _allocPoint,
+            lastRewardBlock: lastRewardBlock,
+            accZombiePerShare: 0,
+            minimumStakingTime: _minimumStakingTime,
+            // Null grave variables
+            isGrave: false,
+            requiresRug: false,
+            ruggedToken: IGraveStakingToken(address(0)),
+            nft: address(0),
+            minimumStake: 0,
+            unlockFee: 0,
+            nftRevivalTime: 0,
+            unlocks: 0
         }));
     }
 
@@ -233,25 +238,27 @@ contract DrFrankenstein is Ownable {
         bool _withUpdate
     ) public onlyOwner {
         require(address(_lpToken) != address(zombie), 'addGrave: zombie cannot be used as grave lptoken.');
+        require(_lpToken.getOwner() == address(this), 'addGrave: DrFrankenstein must be lptoken owner.');
         if (_withUpdate) {
             massUpdatePools();
         }
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint + _allocPoint;
         poolInfo.push(PoolInfo({
-        lpToken: _lpToken, // GraveStakingToken must be owned by DrFrankenstein & should only be used within this contract.
-        allocPoint: _allocPoint,
-        lastRewardBlock: lastRewardBlock,
-        accZombiePerShare: 0,
-        minimumStakingTime: _minimumStakingTime,
-        // Grave variables
-        isGrave: true,
-        requiresRug: true,
-        ruggedToken: _ruggedToken,
-        nft: _nft,
-        minimumStake: _minimumStake,
-        unlockFee: _unlockFee,
-        nftRevivalTime: _nftRevivalTime
+            lpToken: _lpToken,
+            allocPoint: _allocPoint,
+            lastRewardBlock: lastRewardBlock,
+            accZombiePerShare: 0,
+            minimumStakingTime: _minimumStakingTime,
+            // Grave variables
+            isGrave: true,
+            requiresRug: true,
+            ruggedToken: _ruggedToken,
+            nft: _nft,
+            minimumStake: _minimumStake,
+            unlockFee: _unlockFee,
+            nftRevivalTime: _nftRevivalTime,
+            unlocks: 0
         }));
     }
 
@@ -373,6 +380,17 @@ contract DrFrankenstein is Ownable {
             (user.amount - _amount >= pool.minimumStake) || (user.amount - _amount) == 0,
             'Grave: when withdrawing from graves the remaining balance must be 0 or >= grave minimum stake.'
         );
+        uint256 _whaleWithdrawalFee = 0;
+
+        uint amountBasisPointsOfTotalSupply = pool.lpToken.totalSupply().calcBasisPoints(_amount);
+        if(amountBasisPointsOfTotalSupply > 500 && pool.isGrave == false) { // tax 8% of on tokens if whale removes > 5% lp supply.
+            _whaleWithdrawalFee = _amount.calcPortionFromBasisPoints(800);
+            require(pool.lpToken.transfer(lpStorage, _whaleWithdrawalFee)); // Pool: whale tax is added to locked liquidity (burn address)
+        }
+
+        uint256 _remainingAmount = _amount;
+        _remainingAmount -= _whaleWithdrawalFee;
+
 
         updatePool(_pid);
         uint256 pending = ((user.amount * pool.accZombiePerShare) / 1e12) - user.rewardDebt;
@@ -384,18 +402,18 @@ contract DrFrankenstein is Ownable {
         if(pool.isGrave == true && user.amount >= pool.minimumStake && block.timestamp >= user.nftRevivalDate) {
             IRevivedRugNft _nft = IRevivedRugNft(pool.nft);
             uint256 id = _nft.reviveRug(msg.sender);
-            emit ReviveRug(msg.sender, block.timestamp, pool.nft, id);
             user.nftRevivalDate = block.timestamp + pool.nftRevivalTime;
+            emit ReviveRug(msg.sender, block.timestamp, pool.nft, id);
         }
 
         if(_amount > 0) {
             if(pool.isGrave == true) {
                 user.amount = user.amount - _amount;
-                require(zombie.transfer(msg.sender, _amount));
+                require(zombie.transfer(msg.sender, _remainingAmount));
                 pool.lpToken.burn(_amount);
             } else {
                 user.amount = user.amount - _amount;
-                require(pool.lpToken.transfer(address(msg.sender), _amount));
+                require(pool.lpToken.transfer(address(msg.sender), _remainingAmount));
             }
             user.tokenWithdrawalDate = block.timestamp + pool.minimumStakingTime;
         }
@@ -421,7 +439,7 @@ contract DrFrankenstein is Ownable {
         uint amountBasisPointsOfTotalSupply = pool.lpToken.totalSupply().calcBasisPoints(_amount);
         if(amountBasisPointsOfTotalSupply > 500 && pool.isGrave == false) { // tax 8% of on tokens if whale removes > 5% lp supply.
             _whaleWithdrawalFee = _amount.calcPortionFromBasisPoints(800);
-            require(pool.lpToken.transfer(address(0), _whaleWithdrawalFee)); // Pool: whale tax is added to locked liquidity (burn address)
+            require(pool.lpToken.transfer(lpStorage, _whaleWithdrawalFee)); // Pool: whale tax is added to locked liquidity (burn address)
         }
 
         uint256 _remainingAmount = _amount;
@@ -436,7 +454,7 @@ contract DrFrankenstein is Ownable {
         if(_amount > 0) {
             if(pool.isGrave == true) {
                 user.amount = user.amount - _amount;
-                require(zombie.transfer(address(0), _burn));
+                require(zombie.transfer(burnAddr, _burn));
                 require(zombie.transfer(treasury, _toTreasury));
                 require(zombie.transfer(msg.sender, _remainingAmount));
                 pool.lpToken.burn(_amount);
@@ -455,8 +473,9 @@ contract DrFrankenstein is Ownable {
     function enterStaking(uint256 _amount) public isUnlocked(0) {
         PoolInfo storage pool = poolInfo[0];
         UserInfo storage user = userInfo[0][msg.sender];
-        updatePool(0);
+        require(user.amount + _amount >= pool.minimumStake, 'Grave: amount staked must be >= grave minimum stake.');
 
+        updatePool(0);
         if (user.amount > 0) {
             uint256 pending = ((user.amount * pool.accZombiePerShare) / 1e12) - user.rewardDebt;
             if(pending > 0) {
@@ -483,8 +502,12 @@ contract DrFrankenstein is Ownable {
         PoolInfo storage pool = poolInfo[0];
         UserInfo storage user = userInfo[0][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
-        updatePool(0);
+        require(
+            (user.amount - _amount >= pool.minimumStake) || (user.amount - _amount) == 0,
+            'Grave: when withdrawing from graves the remaining balance must be 0 or >= grave minimum stake.'
+        );
 
+        updatePool(0);
         uint256 pending = ((user.amount * pool.accZombiePerShare) / 1e12) - user.rewardDebt;
         if(pending > 0) {
             safeZombieTransfer(msg.sender, pending);
@@ -493,8 +516,8 @@ contract DrFrankenstein is Ownable {
         // mint nft
         if(pool.isGrave == true && user.amount >= pool.minimumStake && block.timestamp >= user.nftRevivalDate) {
             uint id = IRevivedRugNft(pool.nft).reviveRug(msg.sender);
-            emit ReviveRug(msg.sender, block.timestamp,  pool.nft, id);
             user.nftRevivalDate = block.timestamp + pool.nftRevivalTime;
+            emit ReviveRug(msg.sender, block.timestamp,  pool.nft, id);
         }
 
         if(_amount > 0) { // is only true for users who have waited the minimumStakingTime due to modifier
@@ -535,7 +558,7 @@ contract DrFrankenstein is Ownable {
         if(_amount > 0) {
             user.amount = user.amount - _amount;
             user.tokenWithdrawalDate = block.timestamp + pool.minimumStakingTime;
-            require(pool.lpToken.transfer(address(0), _burn));
+            require(pool.lpToken.transfer(burnAddr, _burn));
             require(pool.lpToken.transfer(treasury, _toTreasury));
             require(pool.lpToken.transfer(address(msg.sender), _remainingAmount));
         }
@@ -570,7 +593,7 @@ contract DrFrankenstein is Ownable {
         uint amountBasisPointsOfTotalSupply = pool.lpToken.totalSupply().calcBasisPoints(_amount);
         if(amountBasisPointsOfTotalSupply > 500 && pool.isGrave == false) { // tax 8% of on tokens if whale removes > 5% lp supply.
             uint _whaleWithdrawalFee = _amount.calcPortionFromBasisPoints(800);
-            pool.lpToken.transfer(treasury, _whaleWithdrawalFee); // whale tax is added to locked liquidity (burn address)
+            pool.lpToken.transfer(lpStorage, _whaleWithdrawalFee); // whale tax is added to lockedLiquidity
             _remaining -= _whaleWithdrawalFee;
         }
 
@@ -583,6 +606,7 @@ contract DrFrankenstein is Ownable {
         } else {
             require(pool.lpToken.transfer(address(msg.sender), _remaining));
         }
+
         emit EmergencyWithdraw(msg.sender, _pid, user.amount);
         user.tokenWithdrawalDate = block.timestamp + pool.minimumStakingTime;
         user.nftRevivalDate = block.timestamp + pool.nftRevivalTime;
@@ -612,9 +636,10 @@ contract DrFrankenstein is Ownable {
         uint _toTreasury = _projectFunds.calcPortionFromBasisPoints(5000);
         uint _buyBack = _projectFunds - _toTreasury;
 
-        treasury.transfer(_toTreasury); // half of unlock fee goes to treasury
+        treasury.transfer(_toTreasury);     // half of unlock fee goes to treasury
         buyBackAndBurn(_buyBack);           // the rest is used to buy back and burn zombie token
 
+        poolInfo[_pid].unlocks += 1;
         userInfo[_pid][msg.sender].paidUnlockFee = true;
     }
 
@@ -649,12 +674,6 @@ contract DrFrankenstein is Ownable {
     // Allow dev to change price consumer oracle address
     function setPriceConsumer(IPriceConsumerV3 _priceConsumer) public onlyOwner {
         priceConsumer = _priceConsumer;
-    }
-
-    // Allow dev to set the treasury once after contract creation
-    function setTreasury(address payable _treasury) public onlyOwner {
-        require(treasury == address(0));
-        treasury = _treasury;
     }
 
     // Allow dev to set router, for when we start an AMM
@@ -692,10 +711,10 @@ contract DrFrankenstein is Ownable {
         // burn zombie token if included in pair
         if(address(_token0) == address(zombie) || address(_token1) == address(zombie)) {
             if(address(_token0) == address(zombie)) {             // if _token0 is ZMBE
-                _token0.transfer(address(0), _token0Amount);        // burn the unpaired token0
+                _token0.transfer(burnAddr, _token0Amount);        // burn the unpaired token0
                 _token1.transfer(treasury, _token1Amount);          // send the unpaired token1 to treasury
             } else {                                            // else if _token1 is ZMBE
-                _token1.transfer(address(0), _token1Amount);        // burn the unpaired token1
+                _token1.transfer(burnAddr, _token1Amount);        // burn the unpaired token1
                 _token0.transfer(treasury, _token0Amount);          // send the unpaired token0 to treasury
             }
         } else { // send both tokens to treasury if pair doesnt contain ZMBE token
@@ -715,7 +734,7 @@ contract DrFrankenstein is Ownable {
 
         // make the swap
         pancakeswapRouter.swapExactETHForTokens{value: bnbAmount} (
-            0,                  // todo use an oracle in future iterations to determine proper amount
+            0,
             path,
             address(this),
             block.timestamp
@@ -727,7 +746,7 @@ contract DrFrankenstein is Ownable {
         uint256 _initialZombieBalance = zombie.balanceOf(address(this));
         swapZombieForBnb(bnbAmount);
         uint256 _zombieBoughtBack = zombie.balanceOf(address(this)) - _initialZombieBalance;
-        zombie.transfer(address(0), _zombieBoughtBack); // Send bought zombie to burn address
+        zombie.transfer(burnAddr, _zombieBoughtBack); // Send bought zombie to burn address
     }
 
     // Returns grave unlock fee in bnb

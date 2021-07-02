@@ -150,7 +150,7 @@ module.exports = async function (deployer) {
         "0x896eDE222D3f7f3414e136a2791BDB08AAa25Ce0",   // _ruggedToken
         vikingBrainsNft.address,                        // _nft
         "5000000000000000000000",                       // _minimumStake
-        "5000000000000000000",                          // _unlockFee
+        "1000000000000000000",                          // _unlockFee
         3600,                                           // _nftRevivalTime
         false                                           // _withUpdate
     )
@@ -162,7 +162,7 @@ module.exports = async function (deployer) {
         "0x8C784C49097Dcc637b93232e15810D53871992BF",   // _ruggedToken
         zombieSlayerNft.address,                        // _nft
         "5000000000000000000000",                       // _minimumStake
-        "5000000000000000000",                          // _unlockFee
+        "1000000000000000000",                          // _unlockFee
         3000,                                           // _nftRevivalTime
         false                                           // _withUpdate
     )
@@ -174,7 +174,7 @@ module.exports = async function (deployer) {
         "0x9d8aac497a4b8fe697dd63101d793f0c6a6eebb6",   // _ruggedToken
         zombie100Nft.address,                           // _nft
         "5000000000000000000000",                       // _minimumStake
-        "5000000000000000000",                          // _unlockFee
+        "1000000000000000000",                          // _unlockFee
         3000,                                           // _nftRevivalTime
         false                                           // _withUpdate
     )
@@ -186,7 +186,7 @@ module.exports = async function (deployer) {
         "0xfe75cD11E283813eC44B4592476109Ba3706cef6",   // _ruggedToken
         raremoonNft.address,                            // _nft
         "5000000000000000000000",                       // _minimumStake
-        "5000000000000000000",                          // _unlockFee
+        "1000000000000000000",                          // _unlockFee
         3000,                                           // _nftRevivalTime
         false                                           // _withUpdate
     )
@@ -198,7 +198,7 @@ module.exports = async function (deployer) {
         "0xfe75cD11E283813eC44B4592476109Ba3706cef6",   // _ruggedToken
         fairmoonUncommonNft.address,                    // _nft
         "2500000000000000000000",                       // _minimumStake
-        "5000000000000000000",                          // _unlockFee
+        "1000000000000000000",                          // _unlockFee
         1800,                                           // _nftRevivalTime
         false                                           // _withUpdate
     )
@@ -210,7 +210,7 @@ module.exports = async function (deployer) {
         "0xfe75cD11E283813eC44B4592476109Ba3706cef6",   // _ruggedToken
         fairmoonCommonNft.address,                      // _nft
         "1000000000000000000000",                       // _minimumStake
-        "5000000000000000000",                          // _unlockFee
+        "1000000000000000000",                          // _unlockFee
         1200,                                           // _nftRevivalTime
         false                                           // _withUpdate
     )
@@ -222,7 +222,7 @@ module.exports = async function (deployer) {
         "0x64b783a80d0c05bed0e2f1a638465a7ba3f4a6fb",   // _ruggedToken
         fairmoonCommonNft.address,                      // _nft
         "1000000000000000000000",                       // _minimumStake
-        "5000000000000000000",                          // _unlockFee
+        "1000000000000000000",                          // _unlockFee
         1200,                                           // _nftRevivalTime
         false                                           // _withUpdate
     )
@@ -234,7 +234,7 @@ module.exports = async function (deployer) {
         "0x251a3184857488dc90fa9c9a52fd2d8df473d92c",   // _ruggedToken
         zombieFarmFinanceCommonNft.address,             // _nft
         "1000000000000000000000",                       // _minimumStake
-        "5000000000000000000",                          // _unlockFee
+        "1000000000000000000",                          // _unlockFee
         1200,                                           // _nftRevivalTime
         true                                            // _withUpdate
     )
@@ -246,7 +246,7 @@ module.exports = async function (deployer) {
         "0x9806aec346064183b5cE441313231DFf89811f7A",   // _ruggedToken
         fairmoonCommonNft.address,                      // _nft
         "1000000000000000000000",                       // _minimumStake
-        "5000000000000000000",                          // _unlockFee
+        "1000000000000000000",                          // _unlockFee
         1200,                                           // _nftRevivalTime
         false                                           // _withUpdate
     )
