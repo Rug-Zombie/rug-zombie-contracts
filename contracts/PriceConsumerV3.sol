@@ -34,8 +34,6 @@ contract PriceConsumerV3 {
 
     // Returns unlock fee in BNB
     function usdToBnb(uint _amountInUsd) public view returns (uint) {
-        require(_amountInUsd >= 0, 'PriceConsumer: unlock fee cannot be negative.');
-
         if(_amountInUsd == 0) {
             return 0;
         }
