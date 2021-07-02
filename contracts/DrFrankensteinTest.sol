@@ -12,7 +12,7 @@ import "./interfaces/IRevivedRugNft.sol";
 import "./interfaces/IPriceConsumerV3.sol";
 import "./libraries/Percentages.sol";
 
-interface IMigratorChef {
+interface IMigratorChefTest {
     // Perform LP token migration from legacy PancakeSwap to CakeSwap.
     // Take the current LP token address and return the new LP token address.
     // Migrator should have full access to the caller's LP token.
@@ -30,7 +30,7 @@ interface IMigratorChef {
 // Note that it's ownable and the owner wields tremendous power.
 //
 // Have fun reading it. Hopefully it's bug-free. God bless.
-contract DrFrankenstein is Ownable {
+contract DrFrankensteinTest is Ownable {
     using Percentages for uint256;
 
     // Info of each user.
@@ -87,7 +87,7 @@ contract DrFrankenstein is Ownable {
     // Bonus multiplier for early zombie makers.
     uint256 public BONUS_MULTIPLIER = 1;
     // The migrator contract. It has a lot of power. Can only be set through governance (owner).
-    IMigratorChef public migrator;
+    IMigratorChefTest public migrator;
     // Uniswap routerV2
     IUniswapV2Router02 public pancakeswapRouter;
     // Info of each grave.
@@ -135,19 +135,19 @@ contract DrFrankenstein is Ownable {
 
         // staking pool
         poolInfo.push(PoolInfo({
-            lpToken: IGraveStakingToken(address(_zombie)),
-            allocPoint: 100,
-            lastRewardBlock: startBlock,
-            accZombiePerShare: 0,
-            minimumStakingTime: 5 minutes,
-            requiresRug: false,
-            isGrave: true,
-            ruggedToken: IGraveStakingToken(address(0)),
-            minimumStake: 1000 * (10 ** 18),
-            nft: _firstNft,
-            unlockFee: 5 * (10 ** 18),
-            nftRevivalTime: 10 minutes,
-            unlocks: 0
+        lpToken: IGraveStakingToken(address(_zombie)),
+        allocPoint: 100,
+        lastRewardBlock: startBlock,
+        accZombiePerShare: 0,
+        minimumStakingTime: 5 minutes,
+        requiresRug: false,
+        isGrave: true,
+        ruggedToken: IGraveStakingToken(address(0)),
+        minimumStake: 1000 * (10 ** 18),
+        nft: _firstNft,
+        unlockFee: 5 * (10 ** 18),
+        nftRevivalTime: 10 minutes,
+        unlocks: 0
         }));
 
         totalAllocPoint = 100;
@@ -208,20 +208,20 @@ contract DrFrankenstein is Ownable {
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint + _allocPoint;
         poolInfo.push(PoolInfo({
-            lpToken: _lpToken,
-            allocPoint: _allocPoint,
-            lastRewardBlock: lastRewardBlock,
-            accZombiePerShare: 0,
-            minimumStakingTime: _minimumStakingTime,
-            // Null grave variables
-            isGrave: false,
-            requiresRug: false,
-            ruggedToken: IGraveStakingToken(address(0)),
-            nft: address(0),
-            minimumStake: 0,
-            unlockFee: 0,
-            nftRevivalTime: 0,
-            unlocks: 0
+        lpToken: _lpToken,
+        allocPoint: _allocPoint,
+        lastRewardBlock: lastRewardBlock,
+        accZombiePerShare: 0,
+        minimumStakingTime: _minimumStakingTime,
+        // Null grave variables
+        isGrave: false,
+        requiresRug: false,
+        ruggedToken: IGraveStakingToken(address(0)),
+        nft: address(0),
+        minimumStake: 0,
+        unlockFee: 0,
+        nftRevivalTime: 0,
+        unlocks: 0
         }));
     }
 
@@ -240,26 +240,27 @@ contract DrFrankenstein is Ownable {
         bool _withUpdate
     ) public onlyOwner {
         require(address(_lpToken) != address(zombie), 'addGrave: zombie cannot be used as grave lptoken.');
+        require(_lpToken.getOwner() == address(this), 'addGrave: DrFrankenstein must be lptoken owner.');
         if (_withUpdate) {
             massUpdatePools();
         }
         uint256 lastRewardBlock = block.number > startBlock ? block.number : startBlock;
         totalAllocPoint = totalAllocPoint + _allocPoint;
         poolInfo.push(PoolInfo({
-            lpToken: _lpToken, // GraveStakingToken must be owned by DrFrankenstein & should only be used within this contract.
-            allocPoint: _allocPoint,
-            lastRewardBlock: lastRewardBlock,
-            accZombiePerShare: 0,
-            minimumStakingTime: _minimumStakingTime,
-            // Grave variables
-            isGrave: true,
-            requiresRug: true,
-            ruggedToken: _ruggedToken,
-            nft: _nft,
-            minimumStake: _minimumStake,
-            unlockFee: _unlockFee,
-            nftRevivalTime: _nftRevivalTime,
-            unlocks: 0
+        lpToken: _lpToken,
+        allocPoint: _allocPoint,
+        lastRewardBlock: lastRewardBlock,
+        accZombiePerShare: 0,
+        minimumStakingTime: _minimumStakingTime,
+        // Grave variables
+        isGrave: true,
+        requiresRug: true,
+        ruggedToken: _ruggedToken,
+        nft: _nft,
+        minimumStake: _minimumStake,
+        unlockFee: _unlockFee,
+        nftRevivalTime: _nftRevivalTime,
+        unlocks: 0
         }));
     }
 
@@ -276,7 +277,7 @@ contract DrFrankenstein is Ownable {
     }
 
     // Set the migrator contract. Can only be called by the owner.
-    function setMigrator(IMigratorChef _migrator) public onlyOwner {
+    function setMigrator(IMigratorChefTest _migrator) public onlyOwner {
         migrator = _migrator;
     }
 
