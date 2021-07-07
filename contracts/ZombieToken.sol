@@ -46,11 +46,8 @@ contract ZombieToken is BEP20('Zombie Token', 'ZMBE') {
     /// @notice An event thats emitted when an account changes its delegate
     event DelegateChanged(address indexed delegator, address indexed fromDelegate, address indexed toDelegate);
 
-    // Tracks token stage during launch.
-    // Stage 1: create token lp
-    // Stage 2: enable anti-whale wallet balance limit.
-    // Stage 3: stealth removal of anti-whale wallet balance limit within 1st 48hrs of launch.
-    uint public launchPhase = 1;
+    // Limits wallet balances during launch.
+    bool public launch = true;
     // tracks addresses without anti-whale wallet balance limit. (should only be DrFrankenstain contract)
     mapping (address => bool) public whitelist;
 
@@ -252,10 +249,13 @@ contract ZombieToken is BEP20('Zombie Token', 'ZMBE') {
     }
 
     // Anti whale: 2% wallet balance limit (is lifted after launch)
-
+    // Has to allow tx's from owner so initial liquidity pairing doesnt fail
     modifier whaleDetection(address recipient, uint256 amount) {
         uint256 balanceBasisPointsOfTotalSupply = calcBasisPoints(totalSupply(), amount + balanceOf(recipient));
-        require(balanceBasisPointsOfTotalSupply <= 200 || launchPhase != 2 || whitelist[recipient] == true, 'Whale Detection: wallet cannot hold > 2% of total supply at launch.');
+        require(
+            balanceBasisPointsOfTotalSupply <= 200 || launch == false || whitelist[recipient] == true || msg.sender == owner() || tx.origin == owner(),
+            'Whale Detection: wallet cannot hold > 2% of total supply at launch.'
+        );
         _;
     }
 
@@ -267,10 +267,9 @@ contract ZombieToken is BEP20('Zombie Token', 'ZMBE') {
         return super.transferFrom(sender, recipient, amount);
     }
 
-    function incrementLaunchPhase() public onlyOwner {
-        launchPhase += 1;
+    function liftLaunchWhaleDetection() public onlyOwner {
+        launch = false;
     }
-
 
     function whitelistAddress(address _address) public onlyOwner {
         whitelist[_address] = true;
