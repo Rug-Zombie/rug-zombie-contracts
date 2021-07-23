@@ -31,7 +31,7 @@ module.exports = async function (deployer) {
     //     "0xD99D1c33F9fC3444f8101754aBC46c52416550D1",
     //     RevivedRugNft.address,
     //     PriceConsumerV3.address,
-    //     "10000000000000000000",
+    //     0,
     //     0
     // );
 };

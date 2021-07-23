@@ -8,5 +8,5 @@ module.exports = async function (deployer) {
     // await deployer. deploy(RevivedRugNft, "yApe Common Test", "yApe-COMMONTEST");
     // await deployer. deploy(RevivedRugNft, "Zombie Farm Finance Common Test", "ZMBEFARMTEST");
     // await deployer. deploy(RevivedRugNft, "yPanda Test", "yPANDATEST");
-    await deployer. deploy(RevivedRugNft, "Test", "TEST NFT");
+    // await deployer. deploy(RevivedRugNft, "Test", "TEST NFT");
 };

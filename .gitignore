@@ -3,3 +3,4 @@ build/
 .idea/
 .secret
 .bscscanApiKey
+migrations

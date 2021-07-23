@@ -14,11 +14,12 @@ const bnbPriceConsumer = "0xA31cE87Eb587666CDAe6b35d62A85514A49248b7"
 const burnAddress = "0x000000000000000000000000000000000000dEaD"
 
 module.exports = async function (deployer) {
-    // await deployer.deploy(ZombieToken);
-    // const zombie = await ZombieToken.deployed();
-    // await zombie.mint("100000000000000000000000000")
+    // await deployer.deploy(ZombieToken)
+    // const zombie = await ZombieToken.deployed()
+    // await zombie.mint("80000000000000000000000000")
+    // await zombie.mint(treasury, "10000000000000000000000000")
+    // await zombie.mint(foundersAddress, "10000000000000000000000000")
     // // const zombie = await ZombieToken.at("0x85537ef782bab72e65704aa59e5C71131561D422")
-    //
     // await deployer.deploy(UndeadBar, ZombieToken.address);
     // const undead = await UndeadBar.deployed();
     // // const undead = await UndeadBar.at("0x547BE44e4e2261179943C890CE7919D1b44D02E7")
@@ -52,4 +53,4 @@ module.exports = async function (deployer) {
     //
     // // Must pair and whitelist lp before transferring zombie ownership
     // // await zombie.transferOwnership(DrFrankenstein.address)
-};
+}
