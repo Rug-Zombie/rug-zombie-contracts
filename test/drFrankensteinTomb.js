@@ -1,11 +1,11 @@
 const BigNumber = require("bignumber.js");
 const BN = web3.utils.BN
 
-const DrFrankensteinZombieGrave = artifacts.require("DrFrankenstein")
+const DrFrankenstein = artifacts.require("DrFrankensteinTest")
 const ZombieToken = artifacts.require("ZombieToken")
 const UndeadBar = artifacts.require("UndeadBar")
 const IUniswapV2Pair = artifacts.require("IUniswapV2Pair")
-const PancakeRouter = artifacts.require("IPancakeRouter02")
+const PancakeRouter = artifacts.require("IUniswapV2Router02")
 const PancakeFactory = artifacts.require("IPancakeFactory")
 const WBNB = artifacts.require("WBNB")
 const RevivedRugNft = artifacts.require("RevivedRugNft")
@@ -31,7 +31,7 @@ const max = new BigNumber(2).pow(256).minus(1)
 
 contract("DrFrankenstein", (accounts) => {
     before(async () => {
-        drFrankenstein = await DrFrankensteinZombieGrave.deployed()
+        drFrankenstein = await DrFrankenstein.deployed()
         zombie = await ZombieToken.deployed()
         undead = await UndeadBar.deployed()
         traditionalGraveNft = await RevivedRugNft.deployed()
@@ -77,9 +77,12 @@ contract("DrFrankenstein", (accounts) => {
             {from: accounts[0], gas: 3000000, nonce: await nonce()}
         )
 
+
         // DrFrankenstein setup
         await undead.transferOwnership(drFrankenstein.address, {from: accounts[0], gas: 3000000, nonce: await nonce()})
         await zombie.transferOwnership(drFrankenstein.address, {from: accounts[0], gas: 3000000, nonce: await nonce()})
+
+        await drFrankenstein.liftLaunchWhaleDetection({from: accounts[0], gas: 3000000, nonce: await nonce()})
     })
 
     it('Should create a new tomb when calling #addPool', async () => {
@@ -172,7 +175,7 @@ contract("DrFrankenstein", (accounts) => {
         assert.equal(graveBalance.toNumber(), initialGraveBalance.plus(amount).toString(), 'Unexpected grave lp balance')
         assert.equal(graveUserBalance.toNumber(), initialGraveUserBalance.plus(amount).toString(), 'Unexpected grave user balance')
         assert(
-            Math.abs(tokenWithdrawalDate - expectedTokenWithdrawalDate) < 4,
+            Math.abs(tokenWithdrawalDate - expectedTokenWithdrawalDate) < 5,
             `expected ${expectedTokenWithdrawalDate} but got ${tokenWithdrawalDate}`
         )
         assert.equal(initialWalletZombieBalance.toString(), walletZombieBalance.toString())

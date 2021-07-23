@@ -54,7 +54,6 @@ contract DrFrankenstein is Ownable {
         uint256 rugDeposited;               // How many rugged tokens the user deposited.
         bool paidUnlockFee;                 // true if user paid the unlock fee.
         uint256  nftRevivalDate;            // Date user must wait until before harvesting their nft.
-
     }
 
     // Info of each pool / grave.
@@ -139,14 +138,14 @@ contract DrFrankenstein is Ownable {
             allocPoint: 100,
             lastRewardBlock: startBlock,
             accZombiePerShare: 0,
-            minimumStakingTime: 5 minutes,
+            minimumStakingTime: 3 days,
             requiresRug: false,
             isGrave: true,
             ruggedToken: IGraveStakingToken(address(0)),
-            minimumStake: 1000 * (10 ** 18),
+            minimumStake: 5000 * (10 ** 18),
             nft: _firstNft,
             unlockFee: 5 * (10 ** 18),
-            nftRevivalTime: 10 minutes,
+            nftRevivalTime: 30 days,
             unlocks: 0
         }));
 
@@ -649,8 +648,8 @@ contract DrFrankenstein is Ownable {
     }
 
     // Allow dev to lift 2% wallet balance limit on the zombie token after launch
-    function incrementLaunchPhase() public onlyOwner {
-        zombie.incrementLaunchPhase();
+    function liftLaunchWhaleDetection() public onlyOwner {
+        zombie.liftLaunchWhaleDetection();
     }
 
     // Allow dev to change the nft rewarded from a grave

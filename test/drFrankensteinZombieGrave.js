@@ -66,6 +66,8 @@ contract("DrFrankenstein", (accounts) => {
         await undead.transferOwnership(drFrankenstein.address, {from: accounts[0], gas: 3000000, nonce: await nonce()})
         await zombie.transferOwnership(drFrankenstein.address, {from: accounts[0], gas: 3000000, nonce: await nonce()})
         await zombieGraveNft.transferOwnership(drFrankenstein.address, {from: accounts[0], gas: 3000000, nonce: await nonce()})
+
+        await drFrankenstein.liftLaunchWhaleDetection({from: accounts[0], gas: 3000000, nonce: await nonce()})
     })
 
     // NOTE: Changes made in one test, carry onto the next.
@@ -270,7 +272,7 @@ contract("DrFrankenstein", (accounts) => {
             "Incorrect amount of ZMBE sent to wallet"
         )
         assert(
-            Math.abs(tokenWithdrawalDate - expectedTokenWithdrawalDate) < 4,
+            Math.abs(tokenWithdrawalDate - expectedTokenWithdrawalDate) < 6,
             `expected ${expectedTokenWithdrawalDate} but got ${tokenWithdrawalDate}`,
         )
         assert.equal(nftRevivalDate, initialNftRevivalDate, 'User grave nftRevivalTime had unexpected change')

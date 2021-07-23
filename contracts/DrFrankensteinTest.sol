@@ -54,7 +54,6 @@ contract DrFrankensteinTest is Ownable {
         uint256 rugDeposited;               // How many rugged tokens the user deposited.
         bool paidUnlockFee;                 // true if user paid the unlock fee.
         uint256  nftRevivalDate;            // Date user must wait until before harvesting their nft.
-
     }
 
     // Info of each pool / grave.
@@ -151,8 +150,6 @@ contract DrFrankensteinTest is Ownable {
         }));
 
         totalAllocPoint = 100;
-
-        // testnet
         pancakeswapRouter = IUniswapV2Router02(_pancakeRouter);
         priceConsumer = IPriceConsumerV3(_priceConsumer);
     }
@@ -162,7 +159,7 @@ contract DrFrankensteinTest is Ownable {
         UserInfo memory _user = userInfo[_gid][msg.sender];
         PoolInfo memory _pool = poolInfo[_gid];
         require(_user.rugDeposited > 0 || _pool.requiresRug == false, 'Locked: User has not deposited the required Rugged Token.');
-        require(_user.paidUnlockFee == true || _pool.isGrave == false , 'Locked: User has not unlocked pool / grave.');
+        require(_user.paidUnlockFee == true || _pool.isGrave == false, 'Locked: User has not unlocked pool / grave.');
         _;
     }
 
@@ -651,8 +648,8 @@ contract DrFrankensteinTest is Ownable {
     }
 
     // Allow dev to lift 2% wallet balance limit on the zombie token after launch
-    function incrementLaunchPhase() public onlyOwner {
-        zombie.incrementLaunchPhase();
+    function liftLaunchWhaleDetection() public onlyOwner {
+        zombie.liftLaunchWhaleDetection();
     }
 
     // Allow dev to change the nft rewarded from a grave

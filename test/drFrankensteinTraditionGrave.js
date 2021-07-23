@@ -1,6 +1,6 @@
 const BigNumber = require("bignumber.js");
 
-const DrFrankensteinZombieGrave = artifacts.require("DrFrankenstein")
+const DrFrankensteinZombieGrave = artifacts.require("DrFrankensteinTest")
 const ZombieToken = artifacts.require("ZombieToken")
 const UndeadBar = artifacts.require("UndeadBar")
 const GraveStakingToken = artifacts.require("GraveStakingToken")
@@ -81,6 +81,8 @@ contract("DrFrankenstein", (accounts) => {
         await zombie.transferOwnership(drFrankenstein.address, {from: accounts[0], gas: 3000000, nonce: await nonce()})
         await traditionalGraveNft.transferOwnership(drFrankenstein.address, {from: accounts[0], gas: 3000000, nonce: await nonce()})
         await graveStakingToken.transferOwnership(drFrankenstein.address, {from: accounts[0], gas: 3000000, nonce: await nonce()})
+
+        await drFrankenstein.liftLaunchWhaleDetection({from: accounts[0], gas: 3000000, nonce: await nonce()})
     })
 
     it('Should create a new grave when calling #addGrave', async () => {

@@ -6,9 +6,9 @@ interface IZombieToken {
     function delegates(address delegator) external view returns (address);
     function delegate(address delegatee) external;
     function delegateBySig(address delegatee, uint nonce, uint expiry, uint8 v, bytes32 r, bytes32 s) external;
+    function transferOwnership(address newOwner) external;
     function getCurrentVotes(address account) external view returns (uint256);
     function getPriorVotes(address account, uint blockNumber) external view returns (uint256);
-    function liftWalletBalanceLimit() external returns(bool);
     function totalSupply() external view returns (uint256);
     function balanceOf(address account) external view returns (uint256);
     function transfer(address recipient, uint256 amount) external returns (bool);
@@ -19,5 +19,5 @@ interface IZombieToken {
         address recipient,
         uint256 amount
     ) external returns (bool);
-    function incrementLaunchPhase() external;
+    function liftLaunchWhaleDetection() external;
 }

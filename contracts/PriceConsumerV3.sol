@@ -13,7 +13,7 @@ contract PriceConsumerV3 {
      * Address: 0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE
      */
     constructor() public {
-        priceFeed = AggregatorV3Interface(0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE);
+//        priceFeed = AggregatorV3Interface(0x0567F2323251f0Aab15c8dFb1967E4e8A7D42aeE);
     }
 
     /**
@@ -28,7 +28,7 @@ contract PriceConsumerV3 {
 //        uint80 answeredInRound
 //        ) = priceFeed.latestRoundData();
 //        return uint(price) * 10 ** 10;
-        return 300 * (10 ** 18); // For tests
+        return 300 * 10 ** 18;
     }
 
 

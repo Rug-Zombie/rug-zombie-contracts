@@ -9,4 +9,5 @@ import '../utils/Counters.sol';
 
 interface IRevivedRugNft {
     function reviveRug(address _to) external returns(uint);
+    function owner() external returns(address);
 }
