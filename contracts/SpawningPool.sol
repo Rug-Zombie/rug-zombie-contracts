@@ -1,16 +1,19 @@
-// File: contracts/SmartChefInitializable.sol
+pragma solidity ^0.8.4;
 
-pragma solidity 0.6.12;
+import "./token/BEP20/IBEP20.sol";
+import "./token/BEP20/SafeBEP20.sol";
+import "./access/Ownable.sol";
+import "./interfaces/IRevivedRugNft.sol";
+import "./libraries/Percentages.sol";
+import "./utils/ReentrancyGuard.sol";
+import "./libraries/SpawningPoolPayload.sol";
 
-contract SmartChefInitializable is Ownable, ReentrancyGuard {
-    using SafeMath for uint256;
+contract SpawningPool is Ownable, ReentrancyGuard {
     using SafeBEP20 for IBEP20;
+    using Percentages for uint256;
 
     // The address of the smart chef factory
     address public SMART_CHEF_FACTORY;
-
-    // Whether a limit is set for users
-    bool public hasUserLimit;
 
     // Whether it is initialized
     bool public isInitialized;
@@ -27,9 +30,6 @@ contract SmartChefInitializable is Ownable, ReentrancyGuard {
     // The block number of the last pool update
     uint256 public lastRewardBlock;
 
-    // The pool limit (0 if none)
-    uint256 public poolLimitPerUser;
-
     // CAKE tokens created per block.
     uint256 public rewardPerBlock;
 
@@ -42,12 +42,39 @@ contract SmartChefInitializable is Ownable, ReentrancyGuard {
     // The staked token
     IBEP20 public stakedToken;
 
+    // Address of reward nft.
+    IRevivedRugNft nft;
+
+    // Unlock fee (In BUSD, Chainlink Oracle is used to convert fee to current BNB value).
+    uint256 unlockFee;
+
+    // Minimum amount of lpTokens required to stake.
+    uint256 minimumStake;
+
+    // Duration a user must stake before they can redeem their nft reward.
+    uint256 nftRevivalTime;
+
+    // Duration a user must stake before withdrawal fees are lifted.
+    uint256 minimumStakingTime;
+
+    // Number of unlocks
+    uint256 unlocks;
+
+    // treasury address
+    address payable treasury;
+
+    // burn address
+    address public burnAddr = 0x000000000000000000000000000000000000dEaD; // Burn address
+
     // Info of each user that stakes tokens (stakedToken)
     mapping(address => UserInfo) public userInfo;
 
     struct UserInfo {
-        uint256 amount; // How many staked tokens the user has provided
-        uint256 rewardDebt; // Reward debt
+        uint256 amount;                     // How many staked tokens the user has provided
+        uint256 rewardDebt;                 // Reward debt
+        uint256 tokenWithdrawalDate;        // Date user must wait until before early withdrawal fees are lifted.
+        bool paidUnlockFee;                 // true if user paid the unlock fee.
+        uint256  nftRevivalDate;            // Date user must wait until before harvesting their nft.
     }
 
     event AdminTokenRecovery(address tokenRecovered, uint256 amount);
@@ -55,11 +82,12 @@ contract SmartChefInitializable is Ownable, ReentrancyGuard {
     event EmergencyWithdraw(address indexed user, uint256 amount);
     event NewStartAndEndBlocks(uint256 startBlock, uint256 endBlock);
     event NewRewardPerBlock(uint256 rewardPerBlock);
-    event NewPoolLimit(uint256 poolLimitPerUser);
     event RewardsStop(uint256 blockNumber);
     event Withdraw(address indexed user, uint256 amount);
+    event WithdrawEarly(address indexed user, uint256 amountWithdrawn, uint256 amountLocked);
+    event MintNft(address indexed to, uint date, address nft, uint indexed id);
 
-    constructor() public {
+    constructor() {
         SMART_CHEF_FACTORY = msg.sender;
     }
 
@@ -70,73 +98,83 @@ contract SmartChefInitializable is Ownable, ReentrancyGuard {
      * @param _rewardPerBlock: reward per block (in rewardToken)
      * @param _startBlock: start block
      * @param _bonusEndBlock: end block
-     * @param _poolLimitPerUser: pool limit per user in stakedToken (if any, else 0)
      * @param _admin: admin address with ownership
      */
     function initialize(
-        IBEP20 _stakedToken,
-        IBEP20 _rewardToken,
-        uint256 _rewardPerBlock,
-        uint256 _startBlock,
-        uint256 _bonusEndBlock,
-        uint256 _poolLimitPerUser,
-        address _admin
+        SpawningPoolPayload.Payload memory _payload
     ) external {
         require(!isInitialized, "Already initialized");
         require(msg.sender == SMART_CHEF_FACTORY, "Not factory");
 
-        // Make this contract initialized
+        // // Make this contract initialized
         isInitialized = true;
 
-        stakedToken = _stakedToken;
-        rewardToken = _rewardToken;
-        rewardPerBlock = _rewardPerBlock;
-        startBlock = _startBlock;
-        bonusEndBlock = _bonusEndBlock;
-
-        if (_poolLimitPerUser > 0) {
-            hasUserLimit = true;
-            poolLimitPerUser = _poolLimitPerUser;
-        }
+        stakedToken = _payload.zombie;
+        rewardToken = _payload.rewardToken;
+        rewardPerBlock = _payload.rewardPerBlock;
+        startBlock = _payload.startBlock;
+        bonusEndBlock = _payload.bonusEndBlock;
+        unlockFee = _payload.unlockFee;
+        minimumStake = _payload.minimumStake;
+        nftRevivalTime = _payload.nftRevivalTime;
+        minimumStakingTime = _payload.minimumStakingTime;
+        nft = _payload.nft;
+        treasury = _payload.treasury;
+        unlocks = 0;
 
         uint256 decimalsRewardToken = uint256(rewardToken.decimals());
         require(decimalsRewardToken < 30, "Must be inferior to 30");
 
-        PRECISION_FACTOR = uint256(10**(uint256(30).sub(decimalsRewardToken)));
+        PRECISION_FACTOR = uint256(10**(uint256(30) - decimalsRewardToken));
 
         // Set the lastRewardBlock as the startBlock
         lastRewardBlock = startBlock;
 
         // Transfer ownership to the admin address who becomes owner of the contract
-        transferOwnership(_admin);
+        transferOwnership(_payload.admin);
+    }
+
+    // Ensures the pool is unlocked before a user accesses it.
+    modifier isUnlocked {
+        UserInfo memory _user = userInfo[msg.sender];
+        require(_user.paidUnlockFee == true, 'Locked: User has not unlocked pool.');
+        _;
+    }
+
+    // Ensures user's withdrawal date has passed before withdrawing.
+    modifier canWithdraw(uint _amount) {
+        uint _withdrawalDate = userInfo[msg.sender].tokenWithdrawalDate;
+        require((block.timestamp >= _withdrawalDate && _withdrawalDate > 0) || _amount == 0, 'Staking: Token is still locked, use #withdrawEarly to withdraw funds before the end of your staking period.');
+        _;
     }
 
     /*
      * @notice Deposit staked tokens and collect reward tokens (if any)
      * @param _amount: amount to withdraw (in rewardToken)
      */
-    function deposit(uint256 _amount) external nonReentrant {
+    function deposit(uint256 _amount) external nonReentrant isUnlocked {
         UserInfo storage user = userInfo[msg.sender];
-
-        if (hasUserLimit) {
-            require(_amount.add(user.amount) <= poolLimitPerUser, "User amount above limit");
-        }
+        require(user.amount + _amount >= minimumStake, 'Amount staked must be >= grave minimum stake.');
 
         _updatePool();
 
         if (user.amount > 0) {
-            uint256 pending = user.amount.mul(accTokenPerShare).div(PRECISION_FACTOR).sub(user.rewardDebt);
+            uint256 pending = ((user.amount * accTokenPerShare) / PRECISION_FACTOR) - user.rewardDebt;
             if (pending > 0) {
                 rewardToken.safeTransfer(address(msg.sender), pending);
             }
         }
 
         if (_amount > 0) {
-            user.amount = user.amount.add(_amount);
+            user.tokenWithdrawalDate = block.timestamp + minimumStakingTime;
+            if (user.amount < minimumStake) {
+                user.nftRevivalDate = block.timestamp + nftRevivalTime;
+            }
+            user.amount = user.amount + _amount;
             stakedToken.safeTransferFrom(address(msg.sender), address(this), _amount);
         }
 
-        user.rewardDebt = user.amount.mul(accTokenPerShare).div(PRECISION_FACTOR);
+        user.rewardDebt = (user.amount * accTokenPerShare) / PRECISION_FACTOR;
 
         emit Deposit(msg.sender, _amount);
     }
@@ -145,40 +183,92 @@ contract SmartChefInitializable is Ownable, ReentrancyGuard {
      * @notice Withdraw staked tokens and collect reward tokens
      * @param _amount: amount to withdraw (in rewardToken)
      */
-    function withdraw(uint256 _amount) external nonReentrant {
+    function withdraw(uint256 _amount) external nonReentrant canWithdraw(_amount) {
         UserInfo storage user = userInfo[msg.sender];
         require(user.amount >= _amount, "Amount to withdraw too high");
-
+        require(
+            (user.amount - _amount >= minimumStake) || (user.amount - _amount) == 0,
+            'When withdrawing from spawning pools the remaining balance must be 0 or >= the minimum stake.'
+        );
         _updatePool();
 
-        uint256 pending = user.amount.mul(accTokenPerShare).div(PRECISION_FACTOR).sub(user.rewardDebt);
+        uint256 pending = ((user.amount * accTokenPerShare) / PRECISION_FACTOR) - user.rewardDebt;
+
+        // mint nft
+        if(user.amount >= minimumStake && block.timestamp >= user.nftRevivalDate) {
+            uint256 id = nft.reviveRug(msg.sender);
+            user.nftRevivalDate = block.timestamp + nftRevivalTime;
+            emit MintNft(msg.sender, block.timestamp, address(nft), id);
+        }
 
         if (_amount > 0) {
-            user.amount = user.amount.sub(_amount);
+            user.amount = user.amount - _amount;
             stakedToken.safeTransfer(address(msg.sender), _amount);
+            user.tokenWithdrawalDate = block.timestamp + minimumStakingTime;
         }
 
         if (pending > 0) {
             rewardToken.safeTransfer(address(msg.sender), pending);
         }
 
-        user.rewardDebt = user.amount.mul(accTokenPerShare).div(PRECISION_FACTOR);
+        user.rewardDebt = (user.amount * accTokenPerShare) / PRECISION_FACTOR;
 
         emit Withdraw(msg.sender, _amount);
     }
 
+    function withdrawEarly(uint256 _amount) external nonReentrant canWithdraw(_amount) {
+        UserInfo storage user = userInfo[msg.sender];
+        require(user.amount >= _amount, "Amount to withdraw too high");
+        require(
+            (user.amount - _amount >= minimumStake) || (user.amount - _amount) == 0,
+            'When withdrawing from spawning pools the remaining balance must be 0 or >= the minimum stake.'
+        );
+        uint256 _earlyWithdrawalFee = _amount.calcPortionFromBasisPoints(500);
+        uint256 _burn = _earlyWithdrawalFee.calcPortionFromBasisPoints(5000);   // Half of zombie is burned
+        uint256 _toTreasury = _earlyWithdrawalFee - _burn;                      // The rest is sent to the treasury
+
+        uint256 _remainingAmount = _amount;
+        _remainingAmount -= _earlyWithdrawalFee;
+
+        _updatePool();
+
+        uint256 pending = ((user.amount * accTokenPerShare) / PRECISION_FACTOR) - user.rewardDebt;
+
+        if (_amount > 0) {
+            user.amount = user.amount - _amount;
+            stakedToken.safeTransfer(burnAddr, _burn);
+            stakedToken.safeTransfer(treasury, _toTreasury);
+            stakedToken.safeTransfer(address(msg.sender), _remainingAmount);
+            user.tokenWithdrawalDate = block.timestamp + minimumStakingTime;
+        }
+
+        if (pending > 0) {
+            rewardToken.safeTransfer(address(msg.sender), pending);
+        }
+
+        user.rewardDebt = (user.amount * accTokenPerShare) / PRECISION_FACTOR;
+
+        emit WithdrawEarly(msg.sender, _remainingAmount, _earlyWithdrawalFee);
+    }
+
     /*
-     * @notice Withdraw staked tokens without caring about rewards rewards
+     * @notice Withdraw staked tokens without caring about rewards
      * @dev Needs to be for emergency.
      */
     function emergencyWithdraw() external nonReentrant {
         UserInfo storage user = userInfo[msg.sender];
-        uint256 amountToTransfer = user.amount;
+        uint256 _remaining = user.amount;
         user.amount = 0;
         user.rewardDebt = 0;
 
-        if (amountToTransfer > 0) {
-            stakedToken.safeTransfer(address(msg.sender), amountToTransfer);
+        if(block.timestamp < user.tokenWithdrawalDate) {
+            uint256 _earlyWithdrawalFee = _remaining / 20; // 5% of amount
+            _remaining -= _earlyWithdrawalFee;
+            stakedToken.safeTransfer(treasury, _earlyWithdrawalFee);
+        }
+
+        if (_remaining > 0) {
+            stakedToken.safeTransfer(address(msg.sender), _remaining);
         }
 
         emit EmergencyWithdraw(msg.sender, user.amount);
@@ -213,24 +303,6 @@ contract SmartChefInitializable is Ownable, ReentrancyGuard {
      */
     function stopReward() external onlyOwner {
         bonusEndBlock = block.number;
-    }
-
-    /*
-     * @notice Update pool limit per user
-     * @dev Only callable by owner.
-     * @param _hasUserLimit: whether the limit remains forced
-     * @param _poolLimitPerUser: new pool limit per user
-     */
-    function updatePoolLimitPerUser(bool _hasUserLimit, uint256 _poolLimitPerUser) external onlyOwner {
-        require(hasUserLimit, "Must be set");
-        if (_hasUserLimit) {
-            require(_poolLimitPerUser > poolLimitPerUser, "New limit must be higher");
-            poolLimitPerUser = _poolLimitPerUser;
-        } else {
-            hasUserLimit = _hasUserLimit;
-            poolLimitPerUser = 0;
-        }
-        emit NewPoolLimit(poolLimitPerUser);
     }
 
     /*
@@ -274,12 +346,12 @@ contract SmartChefInitializable is Ownable, ReentrancyGuard {
         uint256 stakedTokenSupply = stakedToken.balanceOf(address(this));
         if (block.number > lastRewardBlock && stakedTokenSupply != 0) {
             uint256 multiplier = _getMultiplier(lastRewardBlock, block.number);
-            uint256 cakeReward = multiplier.mul(rewardPerBlock);
+            uint256 cakeReward = multiplier * rewardPerBlock;
             uint256 adjustedTokenPerShare =
-            accTokenPerShare.add(cakeReward.mul(PRECISION_FACTOR).div(stakedTokenSupply));
-            return user.amount.mul(adjustedTokenPerShare).div(PRECISION_FACTOR).sub(user.rewardDebt);
+            accTokenPerShare + ((cakeReward * PRECISION_FACTOR) / stakedTokenSupply);
+            return ((user.amount * adjustedTokenPerShare) / PRECISION_FACTOR) - user.rewardDebt;
         } else {
-            return user.amount.mul(accTokenPerShare).div(PRECISION_FACTOR).sub(user.rewardDebt);
+            return ((user.amount * accTokenPerShare) / PRECISION_FACTOR) - user.rewardDebt;
         }
     }
 
@@ -299,8 +371,8 @@ contract SmartChefInitializable is Ownable, ReentrancyGuard {
         }
 
         uint256 multiplier = _getMultiplier(lastRewardBlock, block.number);
-        uint256 cakeReward = multiplier.mul(rewardPerBlock);
-        accTokenPerShare = accTokenPerShare.add(cakeReward.mul(PRECISION_FACTOR).div(stakedTokenSupply));
+        uint256 cakeReward = multiplier * rewardPerBlock;
+        accTokenPerShare = accTokenPerShare + ((cakeReward * PRECISION_FACTOR) / stakedTokenSupply);
         lastRewardBlock = block.number;
     }
 
@@ -311,11 +383,11 @@ contract SmartChefInitializable is Ownable, ReentrancyGuard {
      */
     function _getMultiplier(uint256 _from, uint256 _to) internal view returns (uint256) {
         if (_to <= bonusEndBlock) {
-            return _to.sub(_from);
+            return _to - _from;
         } else if (_from >= bonusEndBlock) {
             return 0;
         } else {
-            return bonusEndBlock.sub(_from);
+            return bonusEndBlock - _from;
         }
     }
 }
