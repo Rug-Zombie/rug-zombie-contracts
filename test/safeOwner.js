@@ -19,6 +19,7 @@ const pancakeswapRouterAddress = "0xD99D1c33F9fC3444f8101754aBC46c52416550D1"
 const pancakeswapFactoryAddress = "0x6725F303b657a9451d8BA641348b6761A6CC7a17"
 const wbnbAddress = "0xae13d989daC2f0dEbFf460aC112a837C89BAa7cd"
 const burnAddress = "0x000000000000000000000000000000000000dEaD"
+const zeroAddress = "0x0000000000000000000000000000000000000000"
 const treasury = "0x8df5b3ece7c11749588ed2d102dbc77619c46776"
 
 let drFrankenstein
@@ -111,7 +112,17 @@ contract("SafeOwner", (accounts) => {
             true,
             {from: accounts[0], gas: 3000000, nonce: await nonce()}
         )
+        const poolInfo = await drFrankenstein.poolInfo(1)
         assert.equal((await drFrankenstein.poolLength()).toNumber(), 2, '1 Grave was not added')
+        assert.equal(poolInfo.allocPoint, 0, 'Incorrect allocpoint')
+        assert.equal(poolInfo.lpToken, graveStakingToken.address, 'incorrect lpToken')
+        assert.equal(poolInfo.ruggedToken, ruggedToken.address, 'incorrect ruggedToken')
+        assert.equal(poolInfo.nft, graveNft.address, 'incorrect nft')
+        assert.equal(poolInfo.minimumStake.toString(), one.times(100).toString(), 'incorrect minimumStake')
+        assert.equal(poolInfo.unlockFee.toString(), one.times(10).toString(), 'incorrect unlockFee')
+        assert.equal(poolInfo.nftRevivalTime, 2592000, 'incorrect nftRevivalTime')
+        assert.equal(poolInfo.minimumStakingTime, 259200, 'incorrect minimumStakingTime')
+        assert.equal(poolInfo.isGrave, true, 'incorrect isGrave')
     })
 
     it('Should create a new tomb when calling #addPool', async () => {
@@ -124,7 +135,18 @@ contract("SafeOwner", (accounts) => {
             true,                           // withUpdate
             {from: accounts[0], gas: 3000000, nonce: await nonce()}
         )
+        const poolInfo = await drFrankenstein.poolInfo(2)
+
         assert.equal((await drFrankenstein.poolLength()).toNumber(), 3, '1 Tomb was not added')
+        assert.equal(poolInfo.allocPoint, 0, 'Incorrect allocpoint')
+        assert.equal(poolInfo.lpToken, lpToken.address, 'incorrect lpToken')
+        assert.equal(poolInfo.ruggedToken, zeroAddress, 'incorrect ruggedToken')
+        assert.equal(poolInfo.nft, zeroAddress, 'incorrect nft')
+        assert.equal(poolInfo.minimumStake.toString(), '0', 'incorrect minimumStake')
+        assert.equal(poolInfo.unlockFee.toString(), '0', 'incorrect unlockFee')
+        assert.equal(poolInfo.nftRevivalTime, 0, 'incorrect nftRevivalTime')
+        assert.equal(poolInfo.minimumStakingTime, 259200, 'incorrect minimumStakingTime')
+        assert.equal(poolInfo.isGrave, false, 'incorrect isGrave')
     })
 
     it('Should create a updateMultiplier on #updateMultiplier', async () => {
