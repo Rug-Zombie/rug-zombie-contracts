@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
 import "./token/BEP20/IBEP20.sol";
@@ -7,6 +8,8 @@ import "./interfaces/IRevivedRugNft.sol";
 import "./libraries/Percentages.sol";
 import "./utils/ReentrancyGuard.sol";
 import "./libraries/SpawningPoolPayload.sol";
+import "./interfaces/IPriceConsumerV3.sol";
+import "./interfaces/IUniswapV2Router02.sol";
 
 contract SpawningPool is Ownable, ReentrancyGuard {
     using SafeBEP20 for IBEP20;
@@ -46,25 +49,31 @@ contract SpawningPool is Ownable, ReentrancyGuard {
     IRevivedRugNft nft;
 
     // Unlock fee (In BUSD, Chainlink Oracle is used to convert fee to current BNB value).
-    uint256 unlockFee;
+    uint256 public unlockFee;
 
     // Minimum amount of lpTokens required to stake.
-    uint256 minimumStake;
+    uint256 public minimumStake;
 
     // Duration a user must stake before they can redeem their nft reward.
-    uint256 nftRevivalTime;
+    uint256 public nftRevivalTime;
 
     // Duration a user must stake before withdrawal fees are lifted.
-    uint256 minimumStakingTime;
+    uint256 public minimumStakingTime;
 
     // Number of unlocks
-    uint256 unlocks;
+    uint256 public unlocks;
 
     // treasury address
     address payable treasury;
 
     // burn address
-    address public burnAddr = 0x000000000000000000000000000000000000dEaD; // Burn address
+    address public burnAddr = 0x000000000000000000000000000000000000dEaD;
+
+    // Chainlink BNB Price
+    IPriceConsumerV3 public priceConsumer;
+
+    // Pancakeswap router
+    IUniswapV2Router02 public pancakeswapRouter;
 
     // Info of each user that stakes tokens (stakedToken)
     mapping(address => UserInfo) public userInfo;
@@ -120,6 +129,8 @@ contract SpawningPool is Ownable, ReentrancyGuard {
         minimumStakingTime = _payload.minimumStakingTime;
         nft = _payload.nft;
         treasury = _payload.treasury;
+        priceConsumer = _payload.priceConsumer;
+        pancakeswapRouter = _payload.pancakeswapRouter;
         unlocks = 0;
 
         uint256 decimalsRewardToken = uint256(rewardToken.decimals());
@@ -146,6 +157,21 @@ contract SpawningPool is Ownable, ReentrancyGuard {
         uint _withdrawalDate = userInfo[msg.sender].tokenWithdrawalDate;
         require((block.timestamp >= _withdrawalDate && _withdrawalDate > 0) || _amount == 0, 'Staking: Token is still locked, use #withdrawEarly to withdraw funds before the end of your staking period.');
         _;
+    }
+
+    // Unlocks grave, half of fee is sent to treasury, the rest is used to buyBackAndBurn,
+    function unlock() external payable {
+        require(userInfo[msg.sender].paidUnlockFee == false, 'unlock fee is already paid.');
+        require(msg.value >= unlockFeeInBnb(), 'cannot unlock, insufficient bnb sent.');
+        uint _projectFunds = msg.value;
+        uint _toTreasury = _projectFunds.calcPortionFromBasisPoints(5000);
+        uint _buyBack = _projectFunds - _toTreasury;
+
+        treasury.transfer(_toTreasury);     // half of unlock fee goes to treasury
+        buyBackAndBurn(_buyBack);           // the rest is used to buy back and burn zombie token
+
+        unlocks += 1;
+        userInfo[msg.sender].paidUnlockFee = true;
     }
 
     /*
@@ -216,7 +242,7 @@ contract SpawningPool is Ownable, ReentrancyGuard {
         emit Withdraw(msg.sender, _amount);
     }
 
-    function withdrawEarly(uint256 _amount) external nonReentrant canWithdraw(_amount) {
+    function withdrawEarly(uint256 _amount) external nonReentrant {
         UserInfo storage user = userInfo[msg.sender];
         require(user.amount >= _amount, "Amount to withdraw too high");
         require(
@@ -316,6 +342,11 @@ contract SpawningPool is Ownable, ReentrancyGuard {
         emit NewRewardPerBlock(_rewardPerBlock);
     }
 
+    // Allow dev to change the nft rewarded
+    function setPoolNft(IRevivedRugNft _nft) public onlyOwner {
+        nft = _nft;
+    }
+
     /**
      * @notice It allows the admin to update start and end blocks
      * @dev This function is only callable by owner.
@@ -355,6 +386,11 @@ contract SpawningPool is Ownable, ReentrancyGuard {
         }
     }
 
+    // return treasury address
+    function getTreasury() public view returns(address) {
+        return address(treasury);
+    }
+
     /*
      * @notice Update reward variables of the given pool to be up-to-date.
      */
@@ -374,6 +410,34 @@ contract SpawningPool is Ownable, ReentrancyGuard {
         uint256 cakeReward = multiplier * rewardPerBlock;
         accTokenPerShare = accTokenPerShare + ((cakeReward * PRECISION_FACTOR) / stakedTokenSupply);
         lastRewardBlock = block.number;
+    }
+
+    // Buys and burns zombie
+    function buyBackAndBurn(uint bnbAmount) private {
+        uint256 _initialZombieBalance = stakedToken.balanceOf(address(this));
+        swapZombieForBnb(bnbAmount);
+        uint256 _zombieBoughtBack = stakedToken.balanceOf(address(this)) - _initialZombieBalance;
+        stakedToken.transfer(burnAddr, _zombieBoughtBack); // Send bought zombie to burn address
+    }
+
+    // Returns grave unlock fee in bnb
+    function unlockFeeInBnb() public view returns(uint) {
+        return priceConsumer.usdToBnb(unlockFee);
+    }
+
+    // Buys Zombie with BNB
+    function swapZombieForBnb(uint256 bnbAmount) private {
+        address[] memory path = new address[](2);
+        path[0] = pancakeswapRouter.WETH();
+        path[1] = address(stakedToken);
+
+        // make the swap
+        pancakeswapRouter.swapExactETHForTokens{value: bnbAmount} (
+            0,
+            path,
+            address(this),
+            block.timestamp
+        );
     }
 
     /*
