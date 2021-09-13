@@ -6,7 +6,7 @@ import "./access/Ownable.sol";
 import "./interfaces/IGraveStakingToken.sol";
 import "./interfaces/IPriceConsumerV3.sol";
 
-interface DrFrankenstein {
+interface IDrFrankenstein {
     function updateMultiplier(uint256 multiplierNumber) external;
 
     function addPool(uint _allocPoint, IGraveStakingToken _lpToken, uint _minimumStakingTime, bool _withUpdate) external;
@@ -38,9 +38,9 @@ interface DrFrankenstein {
 
 // The SafeOwner is the new DrFrankenstein owner. It can never set the migrator of the underlying DrFrankenstein, making it a safer contract for a safer world!
 contract SafeOwner is Ownable {
-    DrFrankenstein public drFrankenstein;
+    IDrFrankenstein public drFrankenstein;
 
-    constructor(DrFrankenstein _drFrankenstein) {
+    constructor(IDrFrankenstein _drFrankenstein) {
         drFrankenstein = _drFrankenstein;
     }
 
