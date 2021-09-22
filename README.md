@@ -27,7 +27,7 @@ Deployed contract: [0xf6cDE95D790AC15377A0a525139B5e9D8cc6894e](https://bscscan.
 ### GoodZombie 
 This contract is the owner of the SafeOwner contract and enhances DrFrankenstein security, by restricting the amount of power the owner wallet has when calling functions.
 
-GoodZombie: To be deployed
+GoodZombie: [0xAe689a88bEe2E25E098Dd38970582c096fAbbB08](https://bscscan.com/address/0xAe689a88bEe2E25E098Dd38970582c096fAbbB08)
 
 
 ### Timelock
