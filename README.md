@@ -45,3 +45,7 @@ Each test file must be run independently using:
 These tests are made for a local for of the bsc testnet and the network must be restarted between each test using the following:
 - `ganache-cli -f https://data-seed-prebsc-1-s1.binance.org:8545/`
 - Make sure your testnet wallet has enough BNB to run the tests before forking. You can fund your testnet wallet [here](https://testnet.binance.org/faucet-smart).
+
+## Contract Audits
+
+- Hashex: https://github.com/HashEx/public_audits/blob/master/rugzombie/Zombie%20report.pdf
